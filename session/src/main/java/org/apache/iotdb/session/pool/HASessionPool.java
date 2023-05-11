@@ -481,7 +481,7 @@ public class HASessionPool implements ISessionPool {
     } catch (IoTDBConnectionException | StatementExecutionException ignored) {
     } finally {
       if (wrapper != null) {
-        sessionPool.closeResultSet(wrapper);
+        primarySessionPool.closeResultSet(wrapper);
       }
     }
     if (null == dataRegionConsensusProtocolClass
@@ -555,7 +555,7 @@ public class HASessionPool implements ISessionPool {
     } catch (IoTDBConnectionException | StatementExecutionException ignored) {
     } finally {
       if (wrapper != null) {
-        sessionPool.closeResultSet(wrapper);
+        primarySessionPool.closeResultSet(wrapper);
       }
     }
     return false;

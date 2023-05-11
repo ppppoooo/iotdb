@@ -455,8 +455,9 @@ public class HASessionPool implements ISessionPool {
     Integer schemaReplicationFactor = null;
     int dataLimit = 1;
     int schemaLimit = 1;
+    SessionDataSetWrapper wrapper = null;
     try {
-      SessionDataSetWrapper wrapper = primarySessionPool.executeQueryStatement("SHOW VARIABLES");
+      wrapper = primarySessionPool.executeQueryStatement("SHOW VARIABLES");
       while (wrapper.hasNext()) {
         RowRecord rowRecord = wrapper.next();
         if ("DataReplicationFactor".equals(rowRecord.getFields().get(0).getStringValue())) {
@@ -478,7 +479,10 @@ public class HASessionPool implements ISessionPool {
         }
       }
     } catch (IoTDBConnectionException | StatementExecutionException ignored) {
-      return;
+    } finally {
+      if (wrapper != null) {
+        sessionPool.closeResultSet(wrapper);
+      }
     }
     if (null == dataRegionConsensusProtocolClass
         || null == schemaRegionConsensusProtocolClass
@@ -525,8 +529,9 @@ public class HASessionPool implements ISessionPool {
         return false;
       }
     }
+    SessionDataSetWrapper wrapper = null;
     try {
-      SessionDataSetWrapper wrapper = primarySessionPool.executeQueryStatement("SHOW DATANODES");
+      wrapper = primarySessionPool.executeQueryStatement("SHOW DATANODES");
       Integer statusNum = null;
       for (int k = 0; k < wrapper.getColumnNames().size(); k++) {
         if ("Status".equals(wrapper.getColumnNames().get(k))) {
@@ -545,10 +550,15 @@ public class HASessionPool implements ISessionPool {
           abnormalNum++;
         }
       }
+      wrapper.close();
       return abnormalNum < downNodeNumLimit;
     } catch (IoTDBConnectionException | StatementExecutionException ignored) {
-      return false;
+    } finally {
+      if (wrapper != null) {
+        sessionPool.closeResultSet(wrapper);
+      }
     }
+    return false;
   }
 
   public void setCheckConnectPrimaryClusterS(Integer second) {

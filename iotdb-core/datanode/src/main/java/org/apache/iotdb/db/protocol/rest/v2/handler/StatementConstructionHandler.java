@@ -19,8 +19,10 @@ package org.apache.iotdb.db.protocol.rest.v2.handler;
 
 import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.db.exception.WriteProcessRejectException;
+import org.apache.iotdb.db.protocol.rest.v2.model.InsertRecordRequest;
 import org.apache.iotdb.db.protocol.rest.v2.model.InsertTabletRequest;
 import org.apache.iotdb.db.queryengine.plan.analyze.cache.schema.DataNodeDevicePathCache;
+import org.apache.iotdb.db.queryengine.plan.statement.crud.InsertRowStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.crud.InsertTabletStatement;
 import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import org.apache.iotdb.tsfile.utils.Binary;
@@ -163,5 +165,107 @@ public class StatementConstructionHandler {
     insertStatement.setDataTypes(dataTypes);
     insertStatement.setAligned(insertTabletRequest.getIsAligned());
     return insertStatement;
+  }
+
+  public static InsertRowStatement constructInsertRowStatement(
+      InsertRecordRequest insertRecordRequest)
+      throws IllegalPathException, WriteProcessRejectException {
+    // construct insert statement
+    InsertRowStatement insertRowStatement = new InsertRowStatement();
+    insertRowStatement.setDevicePath(
+        DataNodeDevicePathCache.getInstance().getPartialPath(insertRecordRequest.getDevice()));
+    insertRowStatement.setMeasurements(
+        insertRecordRequest.getMeasurements().toArray(new String[0]));
+    List<Object> rawData = insertRecordRequest.getValues();
+    List<String> rawDataType = insertRecordRequest.getDataTypes();
+    int columnSize = rawDataType.size();
+    Object[] columns = new Object[columnSize];
+    TSDataType[] dataTypes = new TSDataType[columnSize];
+
+    for (int i = 0; i < columnSize; i++) {
+      dataTypes[i] = TSDataType.valueOf(rawDataType.get(i).toUpperCase(Locale.ROOT));
+    }
+
+    for (int columnIndex = 0; columnIndex < columnSize; columnIndex++) {
+      switch (dataTypes[columnIndex]) {
+        case BOOLEAN:
+          Boolean booleanValue = null;
+          Object dataB = rawData.get(columnIndex);
+          if (dataB != null) {
+            if ("1".equals(dataB.toString())) {
+              booleanValue = true;
+            } else if ("0".equals(dataB.toString())) {
+              booleanValue = false;
+            } else {
+              booleanValue = (Boolean) dataB;
+            }
+          }
+          columns[columnIndex] = booleanValue;
+          break;
+        case INT32:
+          Integer intValue;
+          Object dataI = rawData.get(columnIndex);
+          if (dataI == null) {
+            intValue = null;
+          } else if (dataI instanceof Integer) {
+            intValue = (int) dataI;
+          } else {
+            throw new WriteProcessRejectException(
+                "unsupported data type: " + dataI.getClass().toString());
+          }
+          columns[columnIndex] = intValue;
+          break;
+        case INT64:
+          Long longValue;
+          Object dataL = rawData.get(columnIndex);
+          if (dataL == null) {
+            longValue = null;
+          } else if (dataL instanceof Integer) {
+            longValue = Long.valueOf(dataL.toString());
+          } else if (dataL instanceof Long) {
+            longValue = (long) dataL;
+          } else {
+            throw new WriteProcessRejectException(
+                "unsupported data type: " + dataL.getClass().toString());
+          }
+          columns[columnIndex] = longValue;
+          break;
+        case FLOAT:
+          Float floatValue = null;
+          Object dataF = rawData.get(columnIndex);
+          if (dataF != null) {
+            floatValue = Float.valueOf(String.valueOf(dataF));
+          }
+          columns[columnIndex] = floatValue;
+          break;
+        case DOUBLE:
+          Double doubleValue = null;
+          Object dataD = rawData.get(columnIndex);
+          if (dataD != null) {
+            doubleValue = Double.valueOf(String.valueOf(dataD));
+          }
+          columns[columnIndex] = doubleValue;
+          break;
+        case TEXT:
+          Binary binaryValue;
+          Object dataT = rawData.get(columnIndex);
+          if (dataT == null) {
+            binaryValue = new Binary("".getBytes(StandardCharsets.UTF_8));
+          } else {
+            binaryValue = new Binary(dataT.toString().getBytes(StandardCharsets.UTF_8));
+          }
+          columns[columnIndex] = binaryValue;
+          break;
+        default:
+          throw new IllegalArgumentException("Invalid input: " + rawDataType.get(columnIndex));
+      }
+    }
+
+    insertRowStatement.setTime(Long.parseLong(insertRecordRequest.getTimestamp()));
+    insertRowStatement.setValues(columns);
+    insertRowStatement.setDataTypes(dataTypes);
+//    insertRowStatement.setNeedInferType(true);
+    insertRowStatement.setAligned(insertRecordRequest.getIsAligned());
+    return insertRowStatement;
   }
 }

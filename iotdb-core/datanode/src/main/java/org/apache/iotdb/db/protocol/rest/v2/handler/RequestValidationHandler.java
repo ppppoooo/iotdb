@@ -18,6 +18,7 @@
 package org.apache.iotdb.db.protocol.rest.v2.handler;
 
 import org.apache.iotdb.db.protocol.rest.v2.model.ExpressionRequest;
+import org.apache.iotdb.db.protocol.rest.v2.model.InsertRecordRequest;
 import org.apache.iotdb.db.protocol.rest.v2.model.InsertTabletRequest;
 import org.apache.iotdb.db.protocol.rest.v2.model.SQL;
 
@@ -42,6 +43,14 @@ public class RequestValidationHandler {
     Objects.requireNonNull(insertTabletRequest.getDevice(), "device should not be null");
     Objects.requireNonNull(insertTabletRequest.getDataTypes(), "data_types should not be null");
     Objects.requireNonNull(insertTabletRequest.getValues(), "values should not be null");
+  }
+
+  public static void validateInsertRecordRequest(InsertRecordRequest insertRecordRequest) {
+    Objects.requireNonNull(insertRecordRequest.getTimestamp(), "timestamp should not be null");
+    Objects.requireNonNull(insertRecordRequest.getIsAligned(), "is_aligned should not be null");
+    Objects.requireNonNull(insertRecordRequest.getDevice(), "device should not be null");
+    Objects.requireNonNull(insertRecordRequest.getDataTypes(), "data_types should not be null");
+    Objects.requireNonNull(insertRecordRequest.getValues(), "values should not be null");
   }
 
   public static void validateExpressionRequest(ExpressionRequest expressionRequest) {

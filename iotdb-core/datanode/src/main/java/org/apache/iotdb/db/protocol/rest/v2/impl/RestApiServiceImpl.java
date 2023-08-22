@@ -29,6 +29,7 @@ import org.apache.iotdb.db.protocol.rest.v2.handler.QueryDataSetHandler;
 import org.apache.iotdb.db.protocol.rest.v2.handler.RequestValidationHandler;
 import org.apache.iotdb.db.protocol.rest.v2.handler.StatementConstructionHandler;
 import org.apache.iotdb.db.protocol.rest.v2.model.ExecutionStatus;
+import org.apache.iotdb.db.protocol.rest.v2.model.InsertRecordRequest;
 import org.apache.iotdb.db.protocol.rest.v2.model.InsertTabletRequest;
 import org.apache.iotdb.db.protocol.rest.v2.model.SQL;
 import org.apache.iotdb.db.protocol.session.SessionManager;
@@ -41,6 +42,7 @@ import org.apache.iotdb.db.queryengine.plan.execution.ExecutionResult;
 import org.apache.iotdb.db.queryengine.plan.execution.IQueryExecution;
 import org.apache.iotdb.db.queryengine.plan.parser.StatementGenerator;
 import org.apache.iotdb.db.queryengine.plan.statement.Statement;
+import org.apache.iotdb.db.queryengine.plan.statement.crud.InsertRowStatement;
 import org.apache.iotdb.db.queryengine.plan.statement.crud.InsertTabletStatement;
 import org.apache.iotdb.db.utils.SetThreadName;
 import org.apache.iotdb.rpc.TSStatusCode;
@@ -214,6 +216,52 @@ public class RestApiServiceImpl extends RestApiService {
       ExecutionResult result =
           COORDINATOR.execute(
               insertTabletStatement,
+              SESSION_MANAGER.requestQueryId(),
+              null,
+              "",
+              partitionFetcher,
+              schemaFetcher,
+              config.getQueryTimeoutThreshold());
+
+      return Response.ok()
+          .entity(
+              (result.status.code == TSStatusCode.SUCCESS_STATUS.getStatusCode()
+                      || result.status.code == TSStatusCode.REDIRECTION_RECOMMEND.getStatusCode())
+                  ? new ExecutionStatus()
+                      .code(TSStatusCode.SUCCESS_STATUS.getStatusCode())
+                      .message(TSStatusCode.SUCCESS_STATUS.name())
+                  : new ExecutionStatus()
+                      .code(result.status.getCode())
+                      .message(result.status.getMessage()))
+          .build();
+    } catch (Exception e) {
+      return Response.ok().entity(ExceptionHandler.tryCatchException(e)).build();
+    } finally {
+      if (queryId != null) {
+        COORDINATOR.cleanupQueryExecution(queryId);
+      }
+    }
+  }
+
+  @Override
+  public Response insertRecord(
+      InsertRecordRequest insertRecordRequest, SecurityContext securityContext) {
+    Long queryId = null;
+    try {
+      RequestValidationHandler.validateInsertRecordRequest(insertRecordRequest);
+
+      InsertRowStatement insertRowStatement =
+          StatementConstructionHandler.constructInsertRowStatement(insertRecordRequest);
+
+      Response response =
+          authorizationHandler.checkAuthority(securityContext, insertRowStatement);
+      if (response != null) {
+        return response;
+      }
+      queryId = SESSION_MANAGER.requestQueryId();
+      ExecutionResult result =
+          COORDINATOR.execute(
+                  insertRowStatement,
               SESSION_MANAGER.requestQueryId(),
               null,
               "",
